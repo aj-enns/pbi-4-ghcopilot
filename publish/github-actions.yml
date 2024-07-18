@@ -1,0 +1,36 @@
+name: Deploy Power BI Report
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  install-powerbi-modules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Power BI Modules
+        run: |
+          Install-Module -Name MicrosoftPowerBIMgmt -Scope CurrentUser -Force
+          Install-Module -Name MicrosoftPowerBIMgmt.Profile -Scope CurrentUser -Force
+          Install-Module -Name MicrosoftPowerBIMgmt.Reports -Scope CurrentUser -Force
+
+  deploy-pbix:
+    runs-on: ubuntu-latest
+    needs: install-powerbi-modules
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Deploy PBIX file
+        run: |
+          $tenantId = ${{ secrets.TenantId }}
+          $appId = ${{ secrets.AppId }}
+          $appSecret = ${{ secrets.AppSecret }}
+          $secureAppSecret = ConvertTo-SecureString -String $appSecret -AsPlainText -Force
+          $credential = New-Object System.Management.Automation.PSCredential($appId, $secureAppSecret)
+          Connect-PowerBIServiceAccount -ServicePrincipal -Credential $credential -Tenant $tenantId
+          
+          Import-Module MicrosoftPowerBIMgmt.Reports
+
+          New-PowerBIReport -Path './samples/GitHubCopilotTelemetrySample.pbix' -WorkspaceId ${{ secrets.WorkspaceId }} -Name 'copilot_metrics_usage_sample'
