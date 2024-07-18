@@ -131,9 +131,68 @@ Deploy PBIX file using PowerShell with Service Principal Authentication
 ```
 The remaining step is to save, check-in, and then watch it automatically deploy as the trigger is set to monitor the main branch
 
+## Deploying the Power BI Report using GitHub Actions
 
+In addition to Azure DevOps, you can also deploy your Power BI report using GitHub Actions. Below are the instructions on how to set up and use the GitHub Actions workflow to deploy your report to Power BI Workspace.
 
+### Setting up the GitHub Actions Workflow
 
+1. Create a new file in your repository at `.github/workflows/deploy-powerbi.yml`.
+2. Add the following YAML snippet to your workflow file:
+```yaml
+name: Deploy Power BI Report
 
+on:
+  push:
+    branches:
+      - main
 
+jobs:
+  install-powerbi-modules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Power BI Modules
+        run: |
+          Install-Module -Name MicrosoftPowerBIMgmt -Scope CurrentUser -Force
+          Install-Module -Name MicrosoftPowerBIMgmt.Profile -Scope CurrentUser -Force
+          Install-Module -Name MicrosoftPowerBIMgmt.Reports -Scope CurrentUser -Force
+
+  deploy-pbix:
+    runs-on: ubuntu-latest
+    needs: install-powerbi-modules
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Deploy PBIX file
+        run: |
+          $tenantId = ${{ secrets.TenantId }}
+          $appId = ${{ secrets.AppId }}
+          $appSecret = ${{ secrets.AppSecret }}
+          $secureAppSecret = ConvertTo-SecureString -String $appSecret -AsPlainText -Force
+          $credential = New-Object System.Management.Automation.PSCredential($appId, $secureAppSecret)
+          Connect-PowerBIServiceAccount -ServicePrincipal -Credential $credential -Tenant $tenantId
+          
+          Import-Module MicrosoftPowerBIMgmt.Reports
+
+          New-PowerBIReport -Path './samples/GitHubCopilotTelemetrySample.pbix' -WorkspaceId ${{ secrets.WorkspaceId }} -Name 'copilot_metrics_usage_sample'
+```
+
+### Setting up Environment Variables
+
+To securely store and use your environment variables in the GitHub Actions workflow, follow these steps:
+
+1. Go to your GitHub repository.
+2. Click on `Settings`.
+3. Select `Secrets` from the left sidebar.
+4. Click on `New repository secret`.
+5. Add the following secrets with their respective values:
+   - `TenantId`
+   - `AppId`
+   - `AppSecret`
+   - `WorkspaceId`
+
+### Running the Workflow
+
+Once you have set up the workflow file and added the necessary secrets, the workflow will automatically run whenever there is a push to the `main` branch. The workflow will install the required Power BI modules and deploy the PBIX file to your Power BI Workspace using Service Principal Authentication.
 
